@@ -1,13 +1,30 @@
 ---
-title: "R Notebook"
+title: "Morse Transcriber"
 output: html_notebook
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+This workbook converts an audio recording of The Last of Us Morse Cricket to text.
 
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+This code is based almost entirely on Mark Patterson's work, all I did was modify a few settings and remove some unneeded translation stuff.
+
+https://www.r-bloggers.com/morse-code-converter/
+
+Steps:
+Record video of the Morse Cricket.  For best results, turn all audio volumes except effects down to 0, turn off your flashlight (annoying flickering), and stand facing the corner so that the right channel has the strongest audio.
+
+Rip an MP3 from the recording.  I broadcast my videos to YouTube, and then used https://www.onlinevideoconverter.com/mp3-converter to just download an MP3.
+
+Convert to WAV format, I used ffmpeg.
+
+Remove background noise.  I used Audacity and applied a 4200-5200hz bandpass filter.
+
+Run the following blocks of the script as needed.
+
+Good luck!
 
 ```{r}
+# install packages if you don't have them
+
 install.packages("tuneR")
 install.packages("RCurl")
 install.packages("seewave")
@@ -23,22 +40,18 @@ rm(list = ls())
 library(tuneR)
 library(RCurl)
 library(seewave)
- 
-morseref.url <- getURL("https://raw.githubusercontent.com/MarkTPatterson/Blog/master/Morse/morseref.csv", 
-                       ssl.verifypeer = FALSE)
-ref.df <- read.csv(text = morseref.url)
- 
-# helper function:
+
+# helper function - finds the variance of a 100-sample slice of the audio:
 var_find = function(vec, t, s){
   var.out = var(vec[(t-s):(t+s)])
   return(var.out)}
 ```
 
 ```{r}
-infile = "~/repos/morsecricket/data/FromStart.57m.filtered"
-sound.filtered = readWave(paste(infile, ".wav", sep = ""))
-sound.file = sound.filtered
-#sound.file = readWave("~/repos/morsecricket/data/20sec.wav")
+# load up a file
+
+infile = "~/repos/morsecricket/data/60m.filtered"
+sound.file = readWave(paste(infile, ".wav", sep = ""))
 
 #sound.filtered = ffilter(sound.file, from = 4500, to = 5000, bandpass = TRUE, rescale = TRUE, output = "Wave")
 #writeWave(filtered, "~/repos/morsecricket/20sec.filtered.wav")
@@ -46,197 +59,62 @@ sound.file = sound.filtered
 ```
 
 ```{r}
-f = sound.filtered
-s1 = f@left
+# read data into a dataframe
+df = data.frame(indx = 1:length(sound.file@right), vec = sound.file@right)
 
-n <- length(s1)
-p <- fft(s1)
-nUniquePts <- ceiling((n+1)/2)
-p <- p[1:nUniquePts] #select just the first half since the second half 
-                     # is a mirror image of the first
-p <- abs(p)  #take the absolute value, or the magnitude
-p <- p / n #scale by the number of points so that
-           # the magnitude does not depend on the length 
-           # of the signal or on its sampling frequency  
-p <- p^2  # square it to get the power 
+# points to sample:
+sample.points = seq(from = 100, by = 100, to = length(df$vec))
 
-# multiply by two (see technical document for details)
-# odd nfft excludes Nyquist point
-if (n %% 2 > 0){
-  p[2:length(p)] <- p[2:length(p)]*2 # we've got odd number of points fft
-} else {
-  p[2: (length(p) -1)] <- p[2: (length(p) -1)]*2 # we've got even number of points fft
-}
-
-freqArray <- (0:(nUniquePts-1)) * (f@samp.rate / n) #  create the frequency array 
-
-plot(freqArray/1000, 10*log10(p), type='l', col='black', xlab='Frequency (kHz)', ylab='Power (dB)')
-
+# applying the variance finder at the sampled points:
+variance = data.frame(var = sapply(sample.points, 
+                                  function(x){var_find(vec = df$vec,
+                                                       t = x,
+                                                       s = 50)}))
 ```
 
 ```{r}
-# defining the morse to text function:
-#m.to.text.func = function(sound.file){
- 
-  # read data into a dataframe
-  df = data.frame(indx = 1:length(sound.file@right), vec = sound.file@right)
- 
- 
-  # points to sample:
-  sample.points = seq(from = 100, by = 100, to = length(df$vec))
- 
-  # applying the variance finder at the sampled points:
-  variance = data.frame(var = sapply(sample.points, 
-                                    function(x){var_find(vec = df$vec,
-                                                         t = x,
-                                                         s = 50)}))
-```
+# decide which points are 'on'
+on = as.numeric(variance > 100)
 
-```{r}
-  # decide which points are 'on'
-  on = as.numeric(variance > 100)
-  on = inverse.rle(within.list(rle(on), values[lengths<20] <- 1))
-  on = inverse.rle(within.list(rle(on), values[lengths<20] <- 0))
-  tiny.df = data.frame(on = on)
+# special for the cricket.  the chirps are actually a bunch of tiny chirps strung together.
+# fill the small holes between them with 1s, then eliminate small values between big chirps.
+on = inverse.rle(within.list(rle(on), values[lengths<20] <- 1))
+on = inverse.rle(within.list(rle(on), values[lengths<20] <- 0))
 
-  tiny.df$indx = 1:nrow(tiny.df)
+tiny.df = data.frame(on = on)
+tiny.df$indx = 1:nrow(tiny.df)
 
-  # create a vector of changes in on:
-  raw.vec = diff(tiny.df$on)
-
-```
-
-```{r}
-start = 15000
-stop = 20000
-plot(seq(start, stop), on[start:stop])
-#plot(df$indx[start:stop], df$vec[start:stop])
-#plot(seq(start, stop), variance$var[start:stop])
-variance
+# create a vector of changes in on:
+raw.vec = diff(tiny.df$on)
 ```
 
 ```{r}  
 # figure out beeps
 
-  # create indices for change instances -- these will be 1 and -1
-  beep.start.vals = which(raw.vec == 1)
-  beep.stop.vals = which(raw.vec == -1)
-  
-  # trim the last start value if its longer
-  beep.start.vals <- beep.start.vals[1:length(beep.stop.vals)]
-  
-  # converting indices to durations:
-  beep.durs = beep.stop.vals - beep.start.vals
+# create indices for change instances -- these will be 1 and -1
+beep.start.vals = which(raw.vec == 1)
+beep.stop.vals = which(raw.vec == -1)
 
-    ## note: for some files, there seems to be a few 
-  ## few beep durs that are only 1; for now, hard coding these out:
-  beep.durs = beep.durs[beep.durs>10]
+# trim the last start value if its longer
+beep.start.vals <- beep.start.vals[1:length(beep.stop.vals)]
 
-  ## recoding beep durs 
- 
-  ## note: this step needs to  take the beep.durs data and the pause.durs data
-  ## and return duration barriers.  
-
-  ## similar exercise for beep.durs:
-#  raw.tab = table(beep.durs)
-#  beep.centers.raw = kmeans(as.numeric(names(raw.tab[raw.tab > 5])),2)$centers[,1]
-#  beep.centers = beep.centers.raw[order(beep.centers.raw,decreasing = F)]
-#  beep.levels = as.vector(beep.centers)
- 
-#  beep.sep = mean(beep.levels[1:2])
-  beep.sep = 100
-
-beep.durs
-#beep.levels
-#beep.sep
-#beep.durs.let
- 
-  # recoding beep durations to long and short:
-  beep.durs.let = beep.durs
-  beep.durs.let[beep.durs > beep.sep] = "-"
-  beep.durs.let[beep.durs < beep.sep] = "."
-
-  plot(beep.durs)
-  write(paste(unlist(beep.durs.let), collapse = ""), paste(infile, ".txt", sep = ""))
-``` 
- 
-```{r}
-# figure out pauses, if any
-
-  # converting indices to durations:
-  pause.durs = beep.start.vals[-1] - beep.stop.vals[-length(beep.stop.vals)]
+# converting indices to durations:
+beep.durs = beep.stop.vals - beep.start.vals
 
   ## note: for some files, there seems to be a few 
-  ## few beep durs that are only 1; for now, hard coding these out:
-  pause.durs = pause.durs[pause.durs>1]
+## few beep durs that are only 1; for now, hard coding these out:
+beep.durs = beep.durs[beep.durs>10]
 
-  ## first, creating pause barriers:
-  raw.tab = table(pause.durs)
+# short chirps are about 50ish, long chirps are 170+.  Just use 100 as a separator
+beep.sep = 100
 
-  pause.centers.raw = kmeans(as.numeric(names(raw.tab[raw.tab > 5])),3)$centers[,1]
- 
-  pause.centers = pause.centers.raw[order(pause.centers.raw,decreasing = F)]
-  pause.levels = as.vector(pause.centers)
+# recoding beep durations to long and short:
+beep.durs.let = beep.durs
+beep.durs.let[beep.durs > beep.sep] = "-"
+beep.durs.let[beep.durs < beep.sep] = "."
 
-  # determining separator values:
-  pause.sep.1 = mean(pause.levels[1:2])
-  pause.sep.2 = mean(pause.levels[2:3])
-```
- 
-```{r}
-  ## creating the letter and word end vectors:
-  letter.ends = which(pause.durs > pause.sep.1)
-  word.ends = which(as.numeric(pause.durs[pause.durs > pause.sep.1] > pause.sep.2) == 1)
+# interestingly, chirps come in 180ish, 200ish, and 240ish durations.  Meaningful?
+#plot(beep.durs)
 
-    ## grouping the beep duration letters (l's and s's) into letters
-  ## based on the letter ends vector
-  empty.list = list()
-  start.val = 1
-  for(i in 1:length(letter.ends)){
-    cur.points = beep.durs.let[start.val:letter.ends[i]]
-    empty.list[[i]] = paste(cur.points,collapse = "")
-    start.val = letter.ends[i] + 1  
-  }
- 
-  letter.vec = unlist(lapply(empty.list, function(x){ref.df$letter[which(ref.df$code == x)]}))
- 
- 
-  ## grouping letters into words based on word.ends vec:
-  start.val = 1
-  empty.list = list()
-  for(i in 1:length(word.ends)){
-    cur.points = letter.vec[start.val:word.ends[i]]
-    empty.list[[i]] = paste(cur.points,collapse = "")
-    start.val = word.ends[i] + 1  
-  }
- 
- 
-  ## saving as a new vector, with spacing:
-  out = paste(unlist(empty.list),collapse = " ")
-  out
- 
-#  return(out)
-#}
-```
-
-```{r}
-## loading reference files
- 
-## note: you'll need to change the file path for the sf.1 file
- 
-## sound file can be downloaded here:
-## http://www.arrl.org/files/file/Morse/Archive/10%20WPM/140625_10WPM.mp3
- 
-## note: you'll need to convert the file to .wav for the function to work.
- 
- 
-sf.1 = readWave("~/repos/morsecricket/wikipedia.wav")
- 
- 
-# examples:
-m.to.text.func(sf.1)
-```
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
+write(paste(unlist(beep.durs.let), collapse = ""), paste(infile, ".txt", sep = ""))
+``` 
