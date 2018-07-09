@@ -1,5 +1,7 @@
 #!/bin/bash/python3
 
+# find the longest common substring in two files, useful to detect an overlap
+
 def longest_common_substring(s1, s2):
    m = [[0] * (1 + len(s2)) for i in range(1 + len(s1))]
    longest, x_longest = 0, 0

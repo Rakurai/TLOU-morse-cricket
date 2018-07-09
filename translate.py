@@ -1,3 +1,8 @@
+#!/bin/bash/python3
+
+# just some experimental stuff to try and find meaningful words in run-together morse.
+# searches for common words from a dictionary, outputs a pseudo-visual
+
 D = {
 	'e': '.',
 	't': '-',
