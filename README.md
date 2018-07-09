@@ -1,5 +1,11 @@
-# morse-transcriber
-A simple transcriber in R from audio file (.wav) to Morse code dits and dahs in a text file.  Created to decode a possible Morse code easter egg embedded in the video game The Last of Us.
+# TLOU-morse-cricket
+Work in progress on decoding a potential easter egg in The Last of Us.  In the beginning of the Museum section, there's a cricket in a corner that chirps what sounds like Morse code, except with no spaces between letters.  The files here help transcode and try to find words in that chirping.
+
+transcribe.Rmd - A simple transcriber in R from audio file (.wav) to Morse code dits and dahs in a text file.
+
+translate.py - Given a length of dits and dahs, tries to impose words from a dictionary.
+
+longest_substring.py - find the longest common substring between two files, to look for overlap.
 
 # Credit
 This code was pulled almost entirely from Mark Patterson's work on a Morse translator.  I only modified a few things to work reliably with these particular audio recordings.  The original work is here:
