@@ -7,6 +7,42 @@ translate.py - Given a length of dits and dahs, tries to impose words from a dic
 
 longest_substring.py - find the longest common substring between two files, to look for overlap.
 
+## Using `uv` for Virtual Environment Management
+
+1. **Install `uv`** (if not already installed):
+   ```
+   pip install uv
+   ```
+
+2. **Create a virtual environment**:
+   ```
+   uv venv .venv
+   ```
+
+3. **Activate the virtual environment**:
+   - On Linux/macOS:
+     ```
+     source .venv/bin/activate
+     ```
+   - On Windows:
+     ```
+     .venv\Scripts\activate
+     ```
+
+4. **Install dependencies** (add packages as needed):
+   ```
+   uv pip install jupyterlab pytube ffmpeg-python numpy scipy matplotlib librosa
+   ```
+
+5. **Run JupyterLab or Jupyter Notebook**:
+   ```
+   jupyter lab
+   ```
+   or
+   ```
+   jupyter notebook
+   ```
+
 # Credit
 This code was pulled almost entirely from Mark Patterson's work on a Morse translator.  I only modified a few things to work reliably with these particular audio recordings.  The original work is here:
 
