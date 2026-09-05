@@ -1,6 +1,26 @@
 # TLOU-morse-cricket
 Work in progress on decoding a potential easter egg in The Last of Us.  In the beginning of the Museum section, there's a cricket in a corner that chirps what sounds like Morse code, except with no spaces between letters.  The files here help transcode and try to find words in that chirping.
 
+## Answered: it isn't Morse code
+
+**See [FINDINGS.md](FINDINGS.md) for the full analysis.**
+
+The chirping is assembled from **12 distinct pre-recorded samples** — 5 short
+(~103ms) and 7 long (411–571ms) — each replayed verbatim and selected with
+uniform probability roughly every 200ms. Same-length events are the same PCM data
+(waveform correlation 0.96–0.995 within a sample, ~0.10 between samples), and the
+five short samples differ slightly in both length and pitch in the way
+consecutive chirps cut from one field recording would.
+
+The dit:dah ratio is 1:4.8, not the 1:3 that Morse requires. The long/short
+pattern is a uniform random draw over a fixed set of clips, so there is no
+message in the timing. The earlier transcriptions in `data/` were also distorted
+by a segmentation step that welded 15ms-period pulse trains into single blobs;
+details in FINDINGS.md.
+
+This says nothing about *why* a cricket emitter is in that corner — only that the
+sound carries nothing.
+
 transcribe.Rmd - A simple transcriber in R from audio file (.wav) to Morse code dits and dahs in a text file.
 
 translate.py - Given a length of dits and dahs, tries to impose words from a dictionary.
